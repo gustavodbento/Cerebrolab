@@ -27,7 +27,7 @@
     <ClCompile Include="project2.c">
       <Filter>Arquivos de Origem</Filter>
     </ClCompile>
-    <ClCompile Include="character.class.c">
+    <ClCompile Include="character.c">
       <Filter>Arquivos de Origem\classes</Filter>
     </ClCompile>
     <ClCompile Include="utils.c">
@@ -41,7 +41,7 @@
     <ClInclude Include="resource.h">
       <Filter>Arquivos de Cabeçalho</Filter>
     </ClInclude>
-    <ClInclude Include="character.class.h">
+    <ClInclude Include="character.h">
       <Filter>Arquivos de Cabeçalho</Filter>
     </ClInclude>
     <ClInclude Include="utils.h">
@@ -52,5 +52,10 @@
     <ResourceCompile Include="project2.rc">
       <Filter>Arquivos de Recurso</Filter>
     </ResourceCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="..\..\..\..\Downloads\principal.png">
+      <Filter>Arquivos de Origem</Filter>
+    </Image>
   </ItemGroup>
 </Project>
