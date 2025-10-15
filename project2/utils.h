@@ -6,4 +6,5 @@ enum configsGlobais {
     DISPLAY_HEIGHT = 480
 };
 bool handleKeyBoard(ALLEGRO_EVENT event, int keycode);
+bool keyDown(ALLEGRO_EVENT event, int keycode);
 #endif

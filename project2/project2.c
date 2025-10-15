@@ -22,19 +22,35 @@ int main()
     al_register_event_source(event_queue, al_get_display_event_source(display));
     al_register_event_source(event_queue, al_get_timer_event_source(timer));
     al_start_timer(timer);
-    character person1 = { 10.0f,DISPLAY_HEIGHT - 104.0f,128.0f, 128.0f, al_load_bitmap("assets/images/principal.png"),0,3,0,0,0,false,0,0,false};
+
+    character characters[2] = {
+        { 10.0f,DISPLAY_HEIGHT - 104.0f,128.0f, 128.0f, al_load_bitmap("assets/images/principal.png"),0,3,0,0,0,false,0,0,0,0,0 },
+        { DISPLAY_WIDTH - 128.0f,DISPLAY_HEIGHT - 104.0f,128.0f, 128.0f, al_load_bitmap("assets/images/principal.png"),0,3,0,0,0,false,0,0,0,0,0 }
+    };
+    ALLEGRO_BITMAP* background = al_load_bitmap("assets/images/fundo1.png");
     while (true) {
         ALLEGRO_EVENT event;
         al_wait_for_event(event_queue,&event);
         if (event.type == ALLEGRO_EVENT_DISPLAY_CLOSE)
             break;
-        al_clear_to_color(al_map_rgb(0, 0, 0));
-        moveCharacter(event, &person1, timer);
-        updatePhisics(&person1);
-        print(&person1);
+        //al_clear_to_color(al_map_rgb(0, 0, 0));
+        al_draw_scaled_bitmap(background, 0, 0, 1536, 1024, 0, 0, DISPLAY_WIDTH, DISPLAY_HEIGHT,0);
+        moveCharacter(event, &characters[0]);
+        for (int i = 1; i < 2; i++) {
+            moveEnemys(event, characters[0], &characters[i]);
+            colision(&characters[0], &characters[i]);
+        }
+        for (int i = 0; i < 2; i++) {
+            updatePhisics(&characters[i]);
+            print(&characters[i]);
+            updateSprites(timer, &characters[i]);
+        }
         al_flip_display();
     }
-    destroyCharacter(&person1);
+    for (int i = 0; i < 2; i++) {
+        destroyCharacter(&characters[i]);
+    }
+    al_destroy_bitmap(background);
     al_destroy_font(font);
     al_destroy_display(display);
     al_destroy_event_queue(event_queue);

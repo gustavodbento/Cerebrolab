@@ -14,3 +14,7 @@ bool handleKeyBoard(ALLEGRO_EVENT event, int keycode) {
     return keys[keycode];
 
 }
+bool keyDown(ALLEGRO_EVENT event, int keycode) {
+    return event.type == ALLEGRO_EVENT_KEY_DOWN && event.keyboard.keycode == keycode;
+    
+}

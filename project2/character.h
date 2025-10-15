@@ -11,10 +11,14 @@ typedef struct {
     float vx, vy;
     bool onGround;
     float spriteX, spriteY;
-    bool flipSprite;
+    int flags;
+    float jumpPositionY, jumpMaxPositionY;
 } character;
 void updatePhisics(character* person);
 void print(character* person);
-void moveCharacter(ALLEGRO_EVENT event, character* person1, ALLEGRO_TIMER* timer);
+void moveCharacter(ALLEGRO_EVENT event, character* person1);
 void destroyCharacter(character* person);
+void moveEnemys(ALLEGRO_EVENT event, character principalCharacter, character* enemy);
+void updateSprites(ALLEGRO_TIMER* timer, character* person);
+void colision(character* person1, character* person2);
 #endif
