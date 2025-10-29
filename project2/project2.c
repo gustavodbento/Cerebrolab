@@ -38,7 +38,9 @@ int main()
         moveCharacter(event, &characters[0]);
         for (int i = 1; i < 2; i++) {
             moveEnemys(event, characters[0], &characters[i]);
-            colision(&characters[0], &characters[i]);
+            if (characters[0].vx != 0) {
+                colision(&characters[0], &characters[i], 1);
+            }
         }
         for (int i = 0; i < 2; i++) {
             updatePhisics(&characters[i]);

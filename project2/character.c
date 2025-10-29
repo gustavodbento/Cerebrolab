@@ -19,10 +19,42 @@ typedef struct {
     int flags;
     float jumpPositionY, jumpMaxPositionY;
 } character;
-void colision(character* a, character* b){
+void colisionType(character* a, character* b, character c, int type) {
+    float pen_x = c.width;
+    float pen_y = c.height;
+    switch (type) {
+    case 1:
+        if (pen_x < pen_y) {
+            if (a->vx > 0) {
+                a->x -= pen_x;
+            }
+            else if (a->vx < 0) {
+                a->x += pen_x;
+            }
+            a->vx = 0;
+        }
+        else {
+            if (a->vy > 0) {
+                a->y -= pen_y;
+                a->onGround = true;
+            }
+            else if (a->vy < 0) {
+                a->y += pen_y;
+            }
+            a->vy = 0;
+        }
+        break;
+
+    }
+}
+void colision(character* a, character* b, int type){
     if ((a->x + a->width) > b->x && a->x < (b->x + b->width) &&
         (a->y + a->height)>b->y && a->y < b->y + b->height) {
-        printf("colidiu");
+        //escala dos sprites tamanhoreal/tamanhodesenhado
+        float escala = 50.0f / 128.0f;
+        //c = intersecção entre a e b
+        //ia = inicio dos pixels do sprite a em relação ao início da intersecção c
+        //ib = inicio dos pixels do sprite b em relação ao início da intersecção c
         character c, ia, ib;
         if (a->x > b->x) {
             c.x = a->x;
@@ -48,18 +80,39 @@ void colision(character* a, character* b){
             ia.y = 0;
             ib.y = a->height - c.height ;
         }
-        /*
-        todo: terminar a validação da colisão
-        for (int i = 0; i < c.width; i++) {
+        al_lock_bitmap(a->sprite, ALLEGRO_PIXEL_FORMAT_ANY, ALLEGRO_LOCK_READONLY);
+        al_lock_bitmap(b->sprite, ALLEGRO_PIXEL_FORMAT_ANY, ALLEGRO_LOCK_READONLY);
+        bool colision = false;
+       for (int i = 0; i < c.width; i++) {
+           if (colision)
+               break;
             for (int j = 0; j < c.height; j++) {
-                if (al_get_pixel(a->sprite,)) {
+                if (colision)
+                    break;
+                int pixelAx = (i + ia.x) * escala;
+                int pixelAy = (j + ia.y) * escala;
+                int pixelBx = (i + ib.x) * escala;
+                int pixelBy = (j + ib.y) * escala;
+                ALLEGRO_COLOR colorA = al_get_pixel(a->sprite, pixelAx, pixelAy);
+                ALLEGRO_COLOR colorB = al_get_pixel(b->sprite, pixelBx, pixelBy);
 
+                unsigned char rA, gA, bA, aColor;
+                unsigned char rB, gB, bB, bColor;
+
+                al_unmap_rgba(colorA, &rA, &gA, &bA, &aColor);
+                al_unmap_rgba(colorB, &rB, &gB, &bB, &bColor);
+                if (aColor > 0 && bColor > 0) {
+                    colision = true;
+                    colisionType(a, b, c, type);
+                    al_unlock_bitmap(a->sprite);
+                    al_unlock_bitmap(b->sprite);
                 }
             }
-        }*/
+        }
+       
     }
-
 }
+
 void updatePhisics(character* person) {
     if (!person->onGround) {
         person->y += GRAVITY;
@@ -83,9 +136,9 @@ void updatePhisics(character* person) {
     }
 }
 void print(character* person) {
-    ALLEGRO_COLOR color = { 255,0,0,1 };
-    al_draw_filled_rectangle(person->x, person->y, person->x + person->width, person->y + person->height, color);
-    al_draw_scaled_bitmap(person->sprite, person->spriteX, person->spriteY,45.0f,45.0f, person->x, person->y, person->width, person->height, person->flags);
+    //ALLEGRO_COLOR color = { 255,255,255,0.5f };
+    //al_draw_filled_rectangle(person->x, person->y, person->x + (person->width), person->y + (person->height), color);
+    al_draw_scaled_bitmap(person->sprite, person->spriteX, person->spriteY, 50.0f, 50.0f, person->x, person->y, person->width, person->height, person->flags);
 }
 void destroyCharacter(character* person) {
     al_destroy_bitmap(person->sprite);
@@ -105,9 +158,11 @@ void updateSprites(ALLEGRO_TIMER* timer, character* person) {
         person->flags = ALLEGRO_FLIP_HORIZONTAL;
     else if (person->vx > 0)
         person->flags = 0;
-    if (al_get_timer_count(timer) % 8 == 0 && person->vx != 0) {
-        person->spriteX += 45.0f;
-        if (person->spriteX == 360.0f)
+    if (al_get_timer_count(timer) % 10 == 0) {
+        person->spriteX += 50.0f;
+        if (person->vx > 0)
+            person->spriteY = 50.0f;
+        if (person->spriteX == 200.0f)
             person->spriteX = 0;
     }
 }

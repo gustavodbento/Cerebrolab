@@ -20,5 +20,5 @@ void moveCharacter(ALLEGRO_EVENT event, character* person1);
 void destroyCharacter(character* person);
 void moveEnemys(ALLEGRO_EVENT event, character principalCharacter, character* enemy);
 void updateSprites(ALLEGRO_TIMER* timer, character* person);
-void colision(character* person1, character* person2);
+void colision(character* a, character* b, int type);
 #endif
