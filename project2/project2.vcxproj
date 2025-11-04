@@ -138,6 +138,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="character.c" />
+    <ClCompile Include="stage.c" />
     <ClCompile Include="utils.c" />
     <ClCompile Include="project2.c" />
   </ItemGroup>
@@ -147,6 +148,7 @@
   <ItemGroup>
     <ClInclude Include="character.h" />
     <ClInclude Include="resource.h" />
+    <ClInclude Include="stage.h" />
     <ClInclude Include="utils.h" />
   </ItemGroup>
   <ItemGroup>

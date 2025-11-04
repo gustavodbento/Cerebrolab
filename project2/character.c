@@ -3,6 +3,7 @@
 #include <allegro5/allegro_primitives.h>
 #include "utils.h"
 #include <stdio.h>
+#include <math.h>
 
 const float MOVE_SPEED = 3.0f;
 const float JUMP_STRENGTH = -15.0f;
@@ -15,43 +16,118 @@ typedef struct {
     int jumpCount;
     float vx, vy;
     bool onGround;
-    float spriteX, spriteY;
+    int spriteX, spriteY;
     int flags;
     float jumpPositionY, jumpMaxPositionY;
+    float spriteWidth, spriteHeight, spritePartition;
+    bool affectedByGravity;
+    int animationFrameCount, animationDuration;
+    bool active;
+    int bullets;
+    float power;
 } character;
-void colisionType(character* a, character* b, character c, int type) {
-    float pen_x = c.width;
-    float pen_y = c.height;
-    switch (type) {
+void destroyCharacter(character* person) {
+    al_destroy_bitmap(person->sprite);
+    person->active = false;
+}
+void resizeCharacters(character** arr, int addSize, int* size) {
+    int newCount = *size + addSize;
+    character* tmp = malloc(newCount * sizeof(character));
+    int j = 0;
+    for (int i = 0; i < *size; i++) {
+        if ((*arr)[i].active)
+            tmp[j++] = (*arr)[i];
+    }
+    free(*arr);
+    *arr = tmp;
+    *size = newCount;
+}
+void fire(character **bullets,int *bulletsLength, character *person,ALLEGRO_EVENT event) {
+    if (keyDown(event, ALLEGRO_KEY_P) && person->bullets > 0) {
+        resizeCharacters(bullets, 1, bulletsLength);
+        if (*bulletsLength >0) {
+            person->bullets--;
+            character* bala = &((*bullets)[*bulletsLength - 1]);
+            float lado = person->flags == 0? person->width * 0.8 : 0;
+            bala->x = person->x + lado;
+            bala->y = person->y + person->height / 2;
+            bala->width = 24.0f;
+            bala->height = 24.0f;
+            bala->vx = person->flags == 0?5.0f:-5.0f;
+            bala->vy = 0;
+            bala->sprite = al_load_bitmap("assets/images/bala_teste.png");
+            bala->spriteHeight = 100.0f;
+            bala->spriteWidth = 100.0f;
+            bala->spritePartition = 100.0f;
+            bala->spriteX = 0;
+            bala->spriteY = 0;
+            bala->flags = 0;
+            bala->affectedByGravity = false;
+            bala->power = 25;
+            bala->active = true;
+       }
+    }
+}
+void colisionType(character* a, character* b, int type) {
+    float overlapX = (a->x + a->width) - b->x;
+    if (a->x < b->x)
+        overlapX = (a->x + a->width) - b->x;
+    else
+        overlapX = (b->x + b->width) - a->x;
+
+    float overlapY;
+    if (a->y < b->y)
+        overlapY = (a->y + a->height) - b->y;
+    else
+        overlapY = (b->y + b->height) - a->y;
+    bool colisionTop = a->y < b->y;
+    bool colisionRight = a->x < b->x;
+        switch (type) {
     case 1:
-        if (pen_x < pen_y) {
-            if (a->vx > 0) {
-                a->x -= pen_x;
+        if (overlapY < overlapX) {
+            if (colisionTop) {
+                a->onGround = true;
+                a->vy = 0;
             }
-            else if (a->vx < 0) {
-                a->x += pen_x;
+            else { 
+                a->y += MOVE_SPEED;
+                a->vy = 0;
+            }
+        }
+        else {
+            if (colisionRight) {
+                a->x -= MOVE_SPEED;
+            }
+            else {
+                a->x += MOVE_SPEED;
             }
             a->vx = 0;
         }
-        else {
-            if (a->vy > 0) {
-                a->y -= pen_y;
-                a->onGround = true;
-            }
-            else if (a->vy < 0) {
-                a->y += pen_y;
-            }
-            a->vy = 0;
+        break;
+    case 2:
+        if (a->damage >=100 && a->life>0) {
+            a->life--;
+            a->damage = 0;
         }
+        a->damage += b->power;
+        if (a->life <= 0)
+            destroyCharacter(a);
+        b->vx = 0;
         break;
 
     }
 }
-void colision(character* a, character* b, int type){
+bool colision(character* a, character* b, int type){
     if ((a->x + a->width) > b->x && a->x < (b->x + b->width) &&
         (a->y + a->height)>b->y && a->y < b->y + b->height) {
+        if (type == 2) {
+            colisionType(a, b, type);
+            return true;
+        }
+            
         //escala dos sprites tamanhoreal/tamanhodesenhado
-        float escala = 50.0f / 128.0f;
+        float escalaA = a->spritePartition / a->width;
+        float escalaB = b->spritePartition / b->width;
         //c = intersecção entre a e b
         //ia = inicio dos pixels do sprite a em relação ao início da intersecção c
         //ib = inicio dos pixels do sprite b em relação ao início da intersecção c
@@ -83,41 +159,45 @@ void colision(character* a, character* b, int type){
         al_lock_bitmap(a->sprite, ALLEGRO_PIXEL_FORMAT_ANY, ALLEGRO_LOCK_READONLY);
         al_lock_bitmap(b->sprite, ALLEGRO_PIXEL_FORMAT_ANY, ALLEGRO_LOCK_READONLY);
         bool colision = false;
-       for (int i = 0; i < c.width; i++) {
-           if (colision)
-               break;
-            for (int j = 0; j < c.height; j++) {
-                if (colision)
-                    break;
-                int pixelAx = (i + ia.x) * escala;
-                int pixelAy = (j + ia.y) * escala;
-                int pixelBx = (i + ib.x) * escala;
-                int pixelBy = (j + ib.y) * escala;
+        int i = 0;
+        int j = 0;
+       while ( j < c.height && !colision) {
+            while (i < c.width && !colision) {
+                int pixelAx = (i + ia.x) * escalaA;
+                int pixelAy = (j + ia.y) * escalaA;
+                int pixelBx = (i + ib.x) * escalaB;
+                int pixelBy = (j + ib.y) * escalaB;
                 ALLEGRO_COLOR colorA = al_get_pixel(a->sprite, pixelAx, pixelAy);
                 ALLEGRO_COLOR colorB = al_get_pixel(b->sprite, pixelBx, pixelBy);
-
-                unsigned char rA, gA, bA, aColor;
-                unsigned char rB, gB, bB, bColor;
-
-                al_unmap_rgba(colorA, &rA, &gA, &bA, &aColor);
-                al_unmap_rgba(colorB, &rB, &gB, &bB, &bColor);
-                if (aColor > 0 && bColor > 0) {
+                if (colorA.a > 0 && colorB.a > 0) {
                     colision = true;
-                    colisionType(a, b, c, type);
                     al_unlock_bitmap(a->sprite);
                     al_unlock_bitmap(b->sprite);
+                    colisionType(a, b, type);
+                    return true;
                 }
+                i++;
             }
+            j++;
+            i = 0;
         }
+       al_unlock_bitmap(a->sprite);
+       al_unlock_bitmap(b->sprite);
+       return false;
        
     }
+    return false;
+
 }
 
 void updatePhisics(character* person) {
-    if (!person->onGround) {
+    if (!person->onGround && person->affectedByGravity) {
         person->y += GRAVITY;
     }
-    person->x += person->vx;
+    if ( !person->affectedByGravity ||
+        ((person->x > 0 && (person->x+person->width <= DISPLAY_WIDTH / 2 || (person->vx < 0 && person->x + person->width >= DISPLAY_WIDTH / 2))) || 
+        (person->x <= 0 && person->vx > 0)))
+        person->x += person->vx;
     float maxJump = person->jumpPositionY - MAX_JUMP_LENGTH;
     if (person->y > maxJump && person->jumpCount <=3 && person->jumpMaxPositionY > maxJump) {
         person->y += person->vy;
@@ -136,21 +216,28 @@ void updatePhisics(character* person) {
     }
 }
 void print(character* person) {
-    //ALLEGRO_COLOR color = { 255,255,255,0.5f };
-    //al_draw_filled_rectangle(person->x, person->y, person->x + (person->width), person->y + (person->height), color);
-    al_draw_scaled_bitmap(person->sprite, person->spriteX, person->spriteY, 50.0f, 50.0f, person->x, person->y, person->width, person->height, person->flags);
+    //al_draw_filled_rectangle(person->x, person->y, person->x + person->width, person->y + person->height, (ALLEGRO_COLOR) { 255, 0, 0, 1 });
+    al_draw_scaled_bitmap(person->sprite, person->spriteX* person->spritePartition, person->spriteY* person->spritePartition, person->spritePartition, person->spritePartition, person->x, person->y, person->width, person->height, person->flags);
 }
-void destroyCharacter(character* person) {
-    al_destroy_bitmap(person->sprite);
-}
+
 void moveEnemys(ALLEGRO_EVENT event, character principalCharacter, character* enemy) {
     enemy->vx = 0;
-    /*if (enemy->x > principalCharacter.x + principalCharacter.width) {
-        enemy->vx = -MOVE_SPEED;
+    float distanceX = fabs(principalCharacter.x - enemy->x);
+    if (distanceX <= 300) {
+        enemy->spriteY = 1;
+        if (enemy->x > principalCharacter.x + principalCharacter.width) {
+            enemy->vx = -MOVE_SPEED;
+        }
+        else if (enemy->x < principalCharacter.x - principalCharacter.width) {
+            enemy->vx = MOVE_SPEED;
+        }
+        else {
+            enemy->spriteY = 0;
+        }
     }
-    else if (enemy->x < principalCharacter.x - principalCharacter.width) {
-        enemy->vx = MOVE_SPEED;
-    }*/
+    else {
+        enemy->vx = 0; 
+    }
 
 }
 void updateSprites(ALLEGRO_TIMER* timer, character* person) {
@@ -159,23 +246,34 @@ void updateSprites(ALLEGRO_TIMER* timer, character* person) {
     else if (person->vx > 0)
         person->flags = 0;
     if (al_get_timer_count(timer) % 10 == 0) {
-        person->spriteX += 50.0f;
-        if (person->vx > 0)
-            person->spriteY = 50.0f;
-        if (person->spriteX == 200.0f)
+        person->spriteX++;
+        
+        if (person->spriteX >= (int)(person->spriteWidth/ person->spritePartition))
             person->spriteX = 0;
     }
 }
-void moveCharacter(ALLEGRO_EVENT event, character* person) {
+void moveCharacter(ALLEGRO_EVENT event, character* person, ALLEGRO_TIMER* timer) {
     person->vx = 0;
     person->vy = 0;
+    if ((al_get_timer_count(timer) - person->animationFrameCount) > person->animationDuration) {
+        person->spriteY = 0;
+    }
+    
     if (handleKeyBoard(event, ALLEGRO_KEY_A))
     {
         person->vx = -MOVE_SPEED;
+        person->spriteY = 1;
     }
     if (handleKeyBoard(event, ALLEGRO_KEY_D))
     {
         person->vx = MOVE_SPEED;
+        person->spriteY = 1;
+    }
+    if (keyDown(event, ALLEGRO_KEY_P)) {
+        person->spriteY = 2;
+        person->animationDuration = 35;
+        person->animationFrameCount = al_get_timer_count(timer);
+
     }
     if (keyDown(event, ALLEGRO_KEY_W)) {
         person->jumpCount++;
