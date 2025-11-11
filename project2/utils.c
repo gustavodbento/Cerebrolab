@@ -11,7 +11,8 @@ char backgroundImages[2][20] = {
     "menu.png",
     "fundo1.png",
 };
-bool menuScreens[2] = {
+bool menuScreens[3] = {
+    false,
     false,
     false
 };

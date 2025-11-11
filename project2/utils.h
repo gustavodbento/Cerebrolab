@@ -15,7 +15,7 @@ typedef struct {
     ALLEGRO_FONT* font;
     ALLEGRO_COLOR color;
 } button;
-bool menuScreens[2];
+bool menuScreens[3];
 bool handleKeyBoard(ALLEGRO_EVENT event, int keycode);
 bool keyDown(ALLEGRO_EVENT event, int keycode);
 bool mouseButtonHover(float mouseX, float mouseY, button btn);

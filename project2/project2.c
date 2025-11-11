@@ -26,7 +26,7 @@ int main()
     ALLEGRO_DISPLAY* display = al_create_display(DISPLAY_WIDTH, DISPLAY_HEIGHT);
     ALLEGRO_FONT* titleFont = al_load_ttf_font("assets/fonts/metal_slug.ttf", 64, 0);
     ALLEGRO_FONT* optionsFont = al_load_ttf_font("assets/fonts/metal_slug.ttf", 32, 0);
-    ALLEGRO_FONT* font = al_load_ttf_font("assets/fonts/font2.ttf", 24, 0);
+    ALLEGRO_FONT* font = al_load_ttf_font("assets/fonts/Sono-Medium.ttf", 16, 0);
     ALLEGRO_AUDIO_STREAM* musica = al_load_audio_stream("assets/sounds/musica_1.mp3", 4, 2048);
     ALLEGRO_TIMER* timer = al_create_timer(1.0 / 60.0);
     ALLEGRO_EVENT_QUEUE* event_queue = al_create_event_queue();
@@ -37,18 +37,21 @@ int main()
     al_set_window_title(display, "Metal Slug");
     al_start_timer(timer);
     stageCfg configs;
-    configs.personagensLength = 2;
-    configs.personagens = malloc(configs.personagensLength * sizeof(character));
-    configs.personagens[0] = (character) { 10.0f,DISPLAY_HEIGHT - 104.0f,128.0f, 128.0f, al_load_bitmap("assets/images/principal.png"),0,3,0,0,0,false,0,0,0,0,0,200,200,50,true,0,0,true,50 };
-        
-    configs.personagens[1] = (character){ DISPLAY_WIDTH - 128.0f,DISPLAY_HEIGHT - 104.0f,128.0f, 128.0f, al_load_bitmap("assets/images/principal.png"),0,3,0,0,0,false,0,0,0,0,0,200,200,50,true,0,0,true,50 };
-    configs.objetosLength = 0;
-    configs.objetos = malloc(configs.objetosLength * sizeof(character));
+    configs.cameraX = 0;
+    configs.partitionBackground = 1536;
+    configs.backgroundWidth = 1536;
+    configs.initialized = false;
+    configs.lastStage = 0;
+    configs.stage = 0;
+    configs.inMenu = true;
+    configs.complete = false;
     char imagesPath[50] = "assets/images/";
     char backgroundPath[50];
     strcpy_s(backgroundPath, sizeof(backgroundPath), imagesPath);
     strcat_s(backgroundPath, sizeof(backgroundPath), backgroundImages[0]);
     ALLEGRO_BITMAP* background = al_load_bitmap(backgroundPath);
+    ALLEGRO_BITMAP* life = al_load_bitmap("assets/images/heart.png");
+    ALLEGRO_BITMAP* ammo = al_load_bitmap("assets/images/ammo_sprite.png");
     ALLEGRO_COLOR fontColorWhite = al_map_rgb(255, 255, 255);
     ALLEGRO_COLOR fontColorYellow = al_map_rgb(255, 255, 0);
     button menuOptions[3] = {
@@ -67,16 +70,32 @@ int main()
         al_wait_for_event(event_queue,&event);
         if (event.type == ALLEGRO_EVENT_DISPLAY_CLOSE)
             break;
-        
-        al_draw_scaled_bitmap(background, 0, 0, 1536, 1024, 0, 0, DISPLAY_WIDTH, DISPLAY_HEIGHT, 0);
-        
+        al_clear_to_color(al_map_rgb(184, 209, 203));
+        al_draw_scaled_bitmap(background, configs.cameraX, 0, configs.partitionBackground, 
+            !menuScreens[0]?1024:160, 0, 0, DISPLAY_WIDTH, DISPLAY_HEIGHT, 0);
+        handleKeyBoard(event, ALLEGRO_KEY_MAX);
         if (event.type == ALLEGRO_EVENT_MOUSE_AXES) {
             mouseX = event.mouse.x;
             mouseY = event.mouse.y;
         }
         //menu
         if (!menuScreens[0]) {
-            al_draw_text(titleFont, fontColorWhite, DISPLAY_WIDTH / 2, 50, ALLEGRO_ALIGN_CENTRE, "Metal Slug");
+            if (!configs.inMenu && (!configs.initialized || configs.lastStage != 0))
+                changeStage(&background, &configs, configs.stage);
+            char* title;
+            if (configs.lastStage == 0) {
+                title = "Word War";
+            }
+            else if (configs.complete) {
+                title = "Vitoria";
+            }
+            else {
+                title = "Game Over";
+            }
+            al_draw_text(titleFont, fontColorWhite, DISPLAY_WIDTH / 2, 50, ALLEGRO_ALIGN_CENTRE,
+                title
+            );
+            
             if (!menuScreens[1]) {
                 for (int i = 0; i < 3; i++) {
                     if (mouseButtonHover(mouseX, mouseY, menuOptions[i])) {
@@ -88,6 +107,7 @@ int main()
                     if (mouseButtonHover(mouseX, mouseY, menuOptions[i]) && mouseClick(event)) {
                         if (i == 0) {
                             changeStage(&background,&configs,1);
+                            menuScreens[1] = true;
                             menuScreens[0] = true;
                             break;
                         }
@@ -102,69 +122,164 @@ int main()
             }
 
         }
+        //inicio do jogo
         if (menuScreens[0]) {
-            char bulletsText[10];
-            snprintf(bulletsText, sizeof(bulletsText), "%d", configs.personagens[0].bullets);
-            al_draw_text(font, fontColorYellow, 20, 20, ALLEGRO_ALIGN_CENTRE, bulletsText);
-            moveCharacter(event, &configs.personagens[0], timer);
-            fire(&configs.objetos, &configs.objetosLength, &configs.personagens[0], event);
-            for (int i = 1; i < configs.personagensLength; i++) {
-                if (configs.personagens[i].active) {
-                    moveEnemys(event, configs.personagens[0], &configs.personagens[i]);
-                    colision(&configs.personagens[0], &configs.personagens[i], 1);
-                }
-            }
-            int characterInactives = 0;
-            for (int i = 0; i < configs.personagensLength; i++) {
-                if (configs.personagens[i].active) {
-                    updatePhisics(&configs.personagens[i]);
-                    print(&configs.personagens[i]);
-                    updateSprites(timer, &configs.personagens[i]);
-                }
-                else {
-                    characterInactives--;
-                }
-            }
-            resizeCharacters(&configs.personagens, characterInactives, &configs.personagensLength);
-            if (configs.objetosLength > 0) {
-                int bulletsInactive = 0;
-                for (int j = 0; j < configs.objetosLength; j++) {
-                    updatePhisics(&configs.objetos[j]);
-                    print(&configs.objetos[j]);
-                    updateSprites(timer, &configs.objetos[j]);
-                    if (configs.objetos[j].x > DISPLAY_WIDTH)
-                        destroyCharacter(&configs.objetos[j]);
-
-                    for (int i = 1; i < configs.personagensLength; i++) {
-                        if (configs.objetos[j].active) {
-                            if (configs.personagens[i].active && colision(&configs.personagens[i], &configs.objetos[j], 2)) {
-                                destroyCharacter(&configs.objetos[0]);
-                            }
+            if (configs.personagens[0].active) {
+                character *person = &configs.personagens[0];
+                bool bordas = (person->vx > 0 && configs.cameraX + configs.partitionBackground < configs.backgroundWidth ||
+                    (person->vx < 0 && configs.cameraX > 0));
+                for (int i = 0; i < configs.cenariosLength; i++) {
+                    cenario *cenarioSpr = &configs.cenarios[i];
+                    if (cenarioSpr->type > 1 && bordas) {
+                        cenarioSpr->x += -person->vx;
+                    }
+                    if (cenarioSpr->partition == 0)
+                    {
+                        al_draw_scaled_bitmap(cenarioSpr->sprite, cenarioSpr->spriteX, cenarioSpr->spriteY, cenarioSpr->spriteWidth,
+                            cenarioSpr->spriteHeigth, cenarioSpr->x, cenarioSpr->y, cenarioSpr->width, cenarioSpr->height, 0);
+                    }
+                    else {
+                        int areaDesenhada = cenarioSpr->width / cenarioSpr->partition;
+                        for (int i = 0; i <= areaDesenhada; i++) {
+                            al_draw_scaled_bitmap(cenarioSpr->sprite, cenarioSpr->spriteX, cenarioSpr->spriteY, cenarioSpr->spriteWidth,
+                                cenarioSpr->spriteHeigth, i * cenarioSpr->partition, cenarioSpr->y, cenarioSpr->partition, cenarioSpr->height, 0);
                         }
                     }
-                    if (!configs.objetos[j].active)
-                        bulletsInactive--;
                 }
-                resizeCharacters(&configs.objetos, bulletsInactive, &configs.objetosLength);
+                for (int i = 0; i < configs.itensLength; i++) {
+                    cenario *itemSpr = &configs.itens[i];
+                    if (itemSpr->active){
+                        if (bordas) {
+                            itemSpr->x += -person->vx;
+                        }
+                        al_draw_scaled_bitmap(itemSpr->sprite, itemSpr->spriteX, itemSpr->spriteY, itemSpr->spriteWidth,
+                            itemSpr->spriteHeigth, itemSpr->x, itemSpr->y, itemSpr->width, itemSpr->height, 0);
+                        collectItem(itemSpr, person, event);
+                        
+                    }
+                }
+                char bulletsText[10];
+                //desenha a contagem de balas
+                snprintf(bulletsText, sizeof(bulletsText), "%d", configs.personagens[0].bullets);
+                al_draw_text(font, (ALLEGRO_COLOR) { 255, 0, 0, 1 }, 20, 60, ALLEGRO_ALIGN_CENTRE, bulletsText);
+                al_draw_bitmap_region(ammo, 0, 32, 32, 32, 30, 52, 0);
+                for (int i = 0; i < configs.personagens[0].life; i++) {
+                    al_draw_bitmap(life, i * 36 + 5, 20, 0);
+                }
+                //move o personagem
+                printDialog(configs);
+                moveCharacter(event, &configs.personagens[0], timer);
+                //atira
+                if (keyDown(event, ALLEGRO_KEY_P) && configs.personagens[0].bullets > 0) {
+                    fire(&configs.objetos, &configs.objetosLength, &configs.personagens[0], event,25);
+                }
+                for (int i = 1; i < configs.personagensLength; i++) {
+                    if (configs.personagens[i].active) {
+                        moveEnemys(event, configs.personagens[0], &configs.personagens[i], configs);
+                        for (int j = 1; j < configs.personagensLength; j++) {
+                            if (j != i) {
+                                colision(&configs.personagens[i], &configs.personagens[j], 3, &configs.cameraX);
+                            }
+                        }
+                        float distanceX = fabs(configs.personagens[0].x - configs.personagens[i].x);
+                        if (distanceX <= RANGE_COMBAT && (al_get_timer_count(timer) - configs.personagens[i].fireFrameCount) > 60) {
+                            configs.personagens[i].fireFrameCount = al_get_timer_count(timer);
+                            fire(&configs.objetos, &configs.objetosLength, &configs.personagens[i], event,
+                                configs.personagens[i].typeCharacter == 2? 25:50);
+                        }
+                        if (colision(&configs.personagens[0], &configs.personagens[i], 1, &configs.cameraX))
+                            break;
+
+
+                    }
+                }
+                int characterInactives = 0;
+                for (int i = 0; i < configs.personagensLength; i++) {
+                    if (configs.personagens[i].active) {
+                        updatePhisics(&configs.personagens[i], &configs);
+                        print(&configs.personagens[i], configs.cameraX);
+                        updateSprites(timer, &configs.personagens[i]);
+                    }
+                    else {
+                        if (configs.personagens[i].typeCharacter == 3) {
+                            menuScreens[0] = false;
+                            menuScreens[1] = false;
+                            configs.stage = 0;
+                            configs.complete = true;
+                        }
+                            
+                        characterInactives--;
+                    }
+                }
+                resizeCharacters(&configs.personagens, characterInactives, &configs.personagensLength);
+                if (configs.objetosLength > 0) {
+                    int bulletsInactive = 0;
+                    //array de objetos tipos 3 e 4 são balas
+                    for (int j = 0; j < configs.objetosLength; j++) {
+                        if(configs.objetos[j].typeCharacter == 3 || configs.objetos[j].typeCharacter == 4)
+                            updatePhisics(&configs.objetos[j], &configs);
+
+                        print(&configs.objetos[j], configs.cameraX);
+                        updateSprites(timer, &configs.objetos[j]);
+                        if (configs.objetos[j].x > DISPLAY_WIDTH || configs.objetos[j].x < 0)
+                            destroyCharacter(&configs.objetos[j]);
+                        if (configs.objetos[j].typeCharacter == 3) {
+                            for (int i = 1; i < configs.personagensLength; i++) {
+                                if (configs.objetos[j].active) {
+                                    if (configs.personagens[i].active && colision(&configs.personagens[i], &configs.objetos[j], 2, &configs.cameraX)) {
+                                        destroyCharacter(&configs.objetos[j]);
+                                    }
+                                }
+                            }
+                        }
+                        else if (configs.objetos[j].typeCharacter == 4 &&
+                            configs.personagens[0].active &&
+                            colision(&configs.personagens[0], &configs.objetos[j], 2, &configs.cameraX)) {
+                            destroyCharacter(&configs.objetos[j]);
+                        }
+
+                        if (!configs.objetos[j].active)
+                            bulletsInactive--;
+                    }
+                    resizeCharacters(&configs.objetos, bulletsInactive, &configs.objetosLength);
+                }
+            }
+            else {
+                menuScreens[0] = false;
+                menuScreens[1] = false;
+               
+                configs.stage = 0;
             }
         }
         al_flip_display();
     }
-    for (int i = 0; i < configs.personagensLength; i++) {
-        destroyCharacter(&configs.personagens[i]);
+    if (menuScreens[0]) {
+        for (int i = 0; i < configs.personagensLength; i++) {
+            destroyCharacter(&configs.personagens[i]);
+        }
+        for (int j = 0; j < configs.objetosLength; j++)
+            destroyCharacter(&configs.objetos[j]);
+        for (int k = 0; k < configs.cenariosLength; k++)
+            al_destroy_bitmap(configs.cenarios[k].sprite);
+        free(configs.personagens);
+        free(configs.objetos);
+        free(configs.dialogs);
+        free(configs.cenarios);
+        free(configs.itens);
     }
-    for(int j = 0; j< configs.objetosLength; j++)
-        destroyCharacter(&configs.objetos[j]);
-
-    al_destroy_audio_stream(musica);
-    al_uninstall_audio();
-    free(configs.objetos);
-    free(configs.personagens);
+    // bitmaps
     al_destroy_bitmap(background);
+    al_destroy_bitmap(life);
+    al_destroy_bitmap(ammo);
+    // fontes
     al_destroy_font(titleFont);
     al_destroy_font(optionsFont);
-    al_destroy_display(display);
-    al_destroy_event_queue(event_queue);
+    al_destroy_font(font);
 
+    // música e Allegro
+    al_destroy_audio_stream(musica);
+    al_destroy_timer(timer);
+    al_destroy_event_queue(event_queue);
+    al_destroy_display(display);
     return 0;
 }

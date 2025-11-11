@@ -1,34 +1,58 @@
-
-#include <allegro5/allegro.h>
+ï»¿#include <allegro5/allegro.h>
 #include <allegro5/allegro_primitives.h>
 #include "utils.h"
 #include <stdio.h>
 #include <math.h>
-
+#include <time.h>
+#include "stage.h"
+#include "structs.h"
 const float MOVE_SPEED = 3.0f;
 const float JUMP_STRENGTH = -15.0f;
 const float MAX_JUMP_LENGTH = 120.0f;
 const float GRAVITY  = 5.0f;
-typedef struct {
-    float x, y, height, width;
-    ALLEGRO_BITMAP *sprite;
-    float damage, life;
-    int jumpCount;
-    float vx, vy;
-    bool onGround;
-    int spriteX, spriteY;
-    int flags;
-    float jumpPositionY, jumpMaxPositionY;
-    float spriteWidth, spriteHeight, spritePartition;
-    bool affectedByGravity;
-    int animationFrameCount, animationDuration;
-    bool active;
-    int bullets;
-    float power;
-} character;
+const float RANGE_COMBAT = 500;
+
+//tipos 1 - personagem principal 2 - inimigo comuns 3 - chefÃ£o 
+character createCharacter(int type, float x, float width, float height,float spriteWidth, float spriteHeigth,
+    float partition,int id, char* sprite, stageCfg configs, bool random, int lifes) {
+    character c = { 0 };
+    c.x = !random ? x : DISPLAY_WIDTH + 200 + rand() % (int)(configs.backgroundWidth - DISPLAY_WIDTH / 2);
+    c.y = DISPLAY_HEIGHT - 104.0f;
+    c.width = width;
+    c.height = height;
+    c.sprite = al_load_bitmap(sprite);
+    c.damage = 0;
+    c.life = lifes;
+    c.jumpCount = 0;
+    c.vx = 0;
+    c.vy = 0;
+    c.onGround = true;
+    c.spriteX = 0;
+    c.spriteY = 0;
+    c.flags = 0;
+    c.jumpPositionY = 0;
+    c.jumpMaxPositionY = 0;
+    c.spriteWidth = spriteWidth;
+    c.spriteHeight = spriteHeigth;
+    c.spritePartition = partition;
+    c.animationFrameCount = 0;
+    c.animationDuration = 0;
+    c.active = true;
+    c.bullets = 50;
+    c.power = 15;
+    c.typeCharacter = type;
+    c.fireFrameCount = 0;
+    c.direction = 0;
+    c.id = id;
+    return c;
+}
+
 void destroyCharacter(character* person) {
-    al_destroy_bitmap(person->sprite);
-    person->active = false;
+    if(person->active)
+    {
+        al_destroy_bitmap(person->sprite);
+        person->active = false;
+    }
 }
 void resizeCharacters(character** arr, int addSize, int* size) {
     int newCount = *size + addSize;
@@ -42,18 +66,18 @@ void resizeCharacters(character** arr, int addSize, int* size) {
     *arr = tmp;
     *size = newCount;
 }
-void fire(character **bullets,int *bulletsLength, character *person,ALLEGRO_EVENT event) {
-    if (keyDown(event, ALLEGRO_KEY_P) && person->bullets > 0) {
+void fire(character **bullets,int *bulletsLength, character *person,ALLEGRO_EVENT event, float shotPower) {
+    if (person->bullets > 0) {
         resizeCharacters(bullets, 1, bulletsLength);
-        if (*bulletsLength >0) {
+        if (*bulletsLength > 0) {
             person->bullets--;
             character* bala = &((*bullets)[*bulletsLength - 1]);
-            float lado = person->flags == 0? person->width * 0.8 : 0;
+            float lado = person->flags == 0 ? person->width * 0.8 : 0;
             bala->x = person->x + lado;
             bala->y = person->y + person->height / 2;
             bala->width = 24.0f;
             bala->height = 24.0f;
-            bala->vx = person->flags == 0?5.0f:-5.0f;
+            bala->vx = person->flags == 0 ? 5.0f : -5.0f;
             bala->vy = 0;
             bala->sprite = al_load_bitmap("assets/images/bala_teste.png");
             bala->spriteHeight = 100.0f;
@@ -62,13 +86,13 @@ void fire(character **bullets,int *bulletsLength, character *person,ALLEGRO_EVEN
             bala->spriteX = 0;
             bala->spriteY = 0;
             bala->flags = 0;
-            bala->affectedByGravity = false;
-            bala->power = 25;
+            bala->typeCharacter = person->typeCharacter == 1 ? 3 : 4; //diferenciar o tiro de inimigos do personagem principal
+            bala->power = shotPower;
             bala->active = true;
-       }
+        }
     }
 }
-void colisionType(character* a, character* b, int type) {
+void colisionType(character* a, character* b, int type, float *cameraX) {
     float overlapX = (a->x + a->width) - b->x;
     if (a->x < b->x)
         overlapX = (a->x + a->width) - b->x;
@@ -88,6 +112,8 @@ void colisionType(character* a, character* b, int type) {
             if (colisionTop) {
                 a->onGround = true;
                 a->vy = 0;
+                a->jumpPositionY = 0;
+                a->jumpMaxPositionY = 0;
             }
             else { 
                 a->y += MOVE_SPEED;
@@ -97,9 +123,11 @@ void colisionType(character* a, character* b, int type) {
         else {
             if (colisionRight) {
                 a->x -= MOVE_SPEED;
+                //*cameraX -= MOVE_SPEED;
             }
             else {
                 a->x += MOVE_SPEED;
+                //*cameraX += MOVE_SPEED;
             }
             a->vx = 0;
         }
@@ -114,23 +142,45 @@ void colisionType(character* a, character* b, int type) {
             destroyCharacter(a);
         b->vx = 0;
         break;
+    case 3:
+        if (overlapY < overlapX) {
+            if (colisionTop) {
+                a->onGround = true;
+                a->vy = 0;
+            }
+            else {
+                a->y += MOVE_SPEED;
+                a->vy = 0;
+            }
+        }
+        else {
+            if (colisionRight) {
+                a->x -= MOVE_SPEED;
+            }
+            else {
+                a->x += MOVE_SPEED;
+            }
+            a->vx = 0;
+        }
+        break;
 
     }
 }
-bool colision(character* a, character* b, int type){
+bool colision(character* a, character* b, int type, float *cameraX){
     if ((a->x + a->width) > b->x && a->x < (b->x + b->width) &&
         (a->y + a->height)>b->y && a->y < b->y + b->height) {
-        if (type == 2) {
-            colisionType(a, b, type);
+        if (type >1) {
+            if(type <=3)
+            colisionType(a, b, type, cameraX);
             return true;
         }
             
         //escala dos sprites tamanhoreal/tamanhodesenhado
         float escalaA = a->spritePartition / a->width;
         float escalaB = b->spritePartition / b->width;
-        //c = intersecção entre a e b
-        //ia = inicio dos pixels do sprite a em relação ao início da intersecção c
-        //ib = inicio dos pixels do sprite b em relação ao início da intersecção c
+        //c = intersecÃ§Ã£o entre a e b
+        //ia = inicio dos pixels do sprite a em relaÃ§Ã£o ao inÃ­cio da intersecÃ§Ã£o c
+        //ib = inicio dos pixels do sprite b em relaÃ§Ã£o ao inÃ­cio da intersecÃ§Ã£o c
         character c, ia, ib;
         if (a->x > b->x) {
             c.x = a->x;
@@ -173,7 +223,7 @@ bool colision(character* a, character* b, int type){
                     colision = true;
                     al_unlock_bitmap(a->sprite);
                     al_unlock_bitmap(b->sprite);
-                    colisionType(a, b, type);
+                    colisionType(a, b, type, cameraX);
                     return true;
                 }
                 i++;
@@ -189,15 +239,51 @@ bool colision(character* a, character* b, int type){
     return false;
 
 }
+void collectItem(cenario* item, character* person, ALLEGRO_EVENT event) {
+    bool overlappingX = person->x + person->width > item->x && person->x < item->x + item->width;
+    bool overlappingY = person->y + person->height > item->y && person->y < item->y + item->height;
+    if (overlappingX && overlappingY) {
+        if (keyDown(event, ALLEGRO_KEY_SPACE)) {
+            switch (item->type) {
+            case 3:
+                person->bullets += 10;
+                break;
+            case 4:
+                person->life += 1;
+                break;
 
-void updatePhisics(character* person) {
-    if (!person->onGround && person->affectedByGravity) {
+            }
+            item->active = false;
+        }
+    }
+}
+void updatePhisics(character* person, stageCfg *configs) {
+    bool bulletType = (person->typeCharacter == 3 || person->typeCharacter == 4);
+    if (!person->onGround && !bulletType) {
         person->y += GRAVITY;
     }
-    if ( !person->affectedByGravity ||
-        ((person->x > 0 && (person->x+person->width <= DISPLAY_WIDTH / 2 || (person->vx < 0 && person->x + person->width >= DISPLAY_WIDTH / 2))) || 
-        (person->x <= 0 && person->vx > 0)))
+    float centerX = DISPLAY_WIDTH / 2;
+    bool bordas = (person->vx > 0 && configs->cameraX + configs->partitionBackground < configs->backgroundWidth ||
+        (person->vx < 0 && configs->cameraX > 0));
+    if (person->typeCharacter == 1 && bordas
+       ) {
+        configs->cameraX += person->vx;
+    }
+    if (person->typeCharacter != 1 && bordas) {
+        person->x += -configs->personagens[0].vx;
+    }
+    if (bulletType ||
+        ((person->x > 0 && (person->x + person->width <= centerX ||
+            (person->vx < 0 && person->x + person->width >= centerX))) ||
+            (person->x <= 0 && person->vx > 0))
+        || (person->vx > 0 && configs->cameraX + configs->partitionBackground >= configs->backgroundWidth &&
+            person->x + person->width <= DISPLAY_WIDTH)
+        )
+    {
         person->x += person->vx;
+    }
+    if (configs->cameraX <= 0)
+        configs->cameraX = 0;
     float maxJump = person->jumpPositionY - MAX_JUMP_LENGTH;
     if (person->y > maxJump && person->jumpCount <=3 && person->jumpMaxPositionY > maxJump) {
         person->y += person->vy;
@@ -215,30 +301,67 @@ void updatePhisics(character* person) {
         person->onGround = false;
     }
 }
-void print(character* person) {
-    //al_draw_filled_rectangle(person->x, person->y, person->x + person->width, person->y + person->height, (ALLEGRO_COLOR) { 255, 0, 0, 1 });
-    al_draw_scaled_bitmap(person->sprite, person->spriteX* person->spritePartition, person->spriteY* person->spritePartition, person->spritePartition, person->spritePartition, person->x, person->y, person->width, person->height, person->flags);
+void print(character* person, float cameraX) {
+    int maxSprite = person->spriteHeight / person->spritePartition;
+    if (person->spriteY > maxSprite - 1)
+        person->spriteY = 0;
+    al_draw_scaled_bitmap(
+        person->sprite,
+        person->spriteX * person->spritePartition,
+        person->spriteY * person->spritePartition,
+        person->spritePartition,
+        person->spritePartition,
+        person->x,
+        person->y,
+        person->width,
+        person->height,
+        person->flags
+    );
 }
+void moveEnemys(ALLEGRO_EVENT event, character principalCharacter, character* enemy, stageCfg configs) {
+    float distanceX;
+    float playerCenter = principalCharacter.x + principalCharacter.width / 2;
+    float enemyCenter = enemy->x + enemy->width / 2;
+    distanceX = fabs(playerCenter - enemyCenter);
 
-void moveEnemys(ALLEGRO_EVENT event, character principalCharacter, character* enemy) {
-    enemy->vx = 0;
-    float distanceX = fabs(principalCharacter.x - enemy->x);
-    if (distanceX <= 300) {
+
+    if (distanceX > RANGE_COMBAT) {
         enemy->spriteY = 1;
-        if (enemy->x > principalCharacter.x + principalCharacter.width) {
-            enemy->vx = -MOVE_SPEED;
-        }
-        else if (enemy->x < principalCharacter.x - principalCharacter.width) {
-            enemy->vx = MOVE_SPEED;
-        }
-        else {
-            enemy->spriteY = 0;
-        }
-    }
-    else {
-        enemy->vx = 0; 
-    }
 
+        if (enemy->direction == 0) { 
+
+            enemy->vx = MOVE_SPEED / 2;
+            enemy->x += enemy->vx;
+            if (rand() % 200 == 0) enemy->direction = 1; 
+        } else {
+            enemy->vx = -MOVE_SPEED / 2;
+            enemy->x += enemy->vx;
+            if (rand() % 200 == 0) enemy->direction = 0;
+        }
+    }
+    else if (distanceX > 300 && distanceX <= RANGE_COMBAT) {
+        enemy->spriteY = 1;
+
+        if (enemy->x > principalCharacter.x)
+            enemy->vx = -MOVE_SPEED;
+        else
+            enemy->vx = MOVE_SPEED;
+
+        enemy->x += enemy->vx;
+    }else {
+        enemy->spriteY = 2;
+        enemy->vx = 0;
+    }
+    if (enemy->x + enemy->width >= configs.backgroundWidth) {
+        enemy->x -= MOVE_SPEED;
+        enemy->vx = -MOVE_SPEED;
+        enemy->direction = 1;
+    }
+    else if (enemy->x <= -configs.cameraX) {
+        enemy->x += MOVE_SPEED;
+        enemy->vx = MOVE_SPEED;
+        enemy->direction = 0;
+    }
 }
 void updateSprites(ALLEGRO_TIMER* timer, character* person) {
     if (person->vx < 0)
