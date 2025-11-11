@@ -102,7 +102,7 @@ void changeStage(ALLEGRO_BITMAP **background, stageCfg* configs, int stage) {
 			configs->personagens[0] = createCharacter(1, 10, 128, 128,200,200,50
 				,0,"assets/images/principal.png", *configs, false,1);
 			configs->personagens[configs->personagensLength - 1] = createCharacter(3, 
-				2000
+				1500
 				, 256, 256,128,64,64, configs->personagensLength - 1, 
 				"assets/images/right_move_red-Sheet.png", *configs, false,3);
 			configs->objetosLength = 0;

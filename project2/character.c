@@ -16,7 +16,7 @@ const float RANGE_COMBAT = 500;
 character createCharacter(int type, float x, float width, float height,float spriteWidth, float spriteHeigth,
     float partition,int id, char* sprite, stageCfg configs, bool random, int lifes) {
     character c = { 0 };
-    c.x = !random ? x : DISPLAY_WIDTH + 200 + rand() % (int)(configs.backgroundWidth - DISPLAY_WIDTH / 2);
+    c.x = !random ? x : DISPLAY_WIDTH + 200 + rand() % (int)(1500 - DISPLAY_WIDTH / 2);
     c.y = DISPLAY_HEIGHT - 104.0f;
     c.width = width;
     c.height = height;
