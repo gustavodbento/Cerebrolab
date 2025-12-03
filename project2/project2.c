@@ -54,10 +54,9 @@ int main()
     ALLEGRO_BITMAP* ammo = al_load_bitmap("assets/images/ammo_sprite.png");
     ALLEGRO_COLOR fontColorWhite = al_map_rgb(255, 255, 255);
     ALLEGRO_COLOR fontColorYellow = al_map_rgb(255, 255, 0);
-    button menuOptions[3] = {
+    button menuOptions[2] = {
         {DISPLAY_WIDTH / 2,140, "Novo Jogo", optionsFont, fontColorWhite},
-        {DISPLAY_WIDTH / 2,170, "Opcoes", optionsFont, fontColorWhite},
-        {DISPLAY_WIDTH / 2,200, "Sair", optionsFont, fontColorWhite}
+        {DISPLAY_WIDTH / 2,170, "Sair", optionsFont, fontColorWhite}
     };
     card selectCharacter[2] = {
         {DISPLAY_WIDTH / 2 - 148,DISPLAY_HEIGHT/2,128,128,50,0,0, al_load_bitmap("assets/images/principal.png"),"Fred",optionsFont, al_map_rgb(255,255,255), true},
@@ -102,7 +101,7 @@ int main()
             );
             
             if (!menuScreens[1]) {
-                for (int i = 0; i < 3; i++) {
+                for (int i = 0; i < 2; i++) {
                     mouseHoverButton(mouseX, mouseY, &menuOptions[i], fontColorYellow, fontColorWhite);
                     al_draw_text(menuOptions[i].font, menuOptions[i].color, menuOptions[i].x, menuOptions[i].y, ALLEGRO_ALIGN_CENTRE, menuOptions[i].text);
                    
@@ -111,7 +110,7 @@ int main()
                             menuScreens[1] = true;
                             break;
                         }
-                        if (i == 2) {
+                        if (i == 1) {
                             isRunning = false;
                             break;
                         }

@@ -65,7 +65,7 @@ void changeStage(ALLEGRO_BITMAP **background, stageCfg* configs, int stage) {
 	switch (stage) {
 		case 1:
 			strcpy_s(configs->background, sizeof(configs->background), "floresta/bgcolor.png");
-			configs->personagensLength = 10;
+			configs->personagensLength = 8;
 			configs->personagens = malloc(configs->personagensLength * sizeof(character));
 			configs->cenariosLength = 50;
 			configs->cenarios = malloc(configs->cenariosLength * sizeof(cenario));
