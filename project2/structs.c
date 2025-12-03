@@ -21,7 +21,17 @@ typedef struct {
     float x,y;
     char* text;
     ALLEGRO_FONT* font;
+    bool active;
 } dialog;
+typedef struct {
+    float x, y, width, height, partition;
+    int spriteX, spriteY;
+    ALLEGRO_BITMAP* sprite;
+    char* text;
+    ALLEGRO_FONT* font;
+    ALLEGRO_COLOR color;
+    bool active;
+} card;
 typedef struct {
     float x, y, height, width, spriteX, 
         spriteY, spriteWidth,spriteHeigth, partition;

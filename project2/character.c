@@ -11,7 +11,9 @@ const float JUMP_STRENGTH = -15.0f;
 const float MAX_JUMP_LENGTH = 120.0f;
 const float GRAVITY  = 5.0f;
 const float RANGE_COMBAT = 500;
-
+const float BULLET_SPEED = 7;
+const int FIRE_TIME = 15;
+const int ENEMY_FIRE_TIME = 40;
 //tipos 1 - personagem principal 2 - inimigo comuns 3 - chefão 
 character createCharacter(int type, float x, float width, float height,float spriteWidth, float spriteHeigth,
     float partition,int id, char* sprite, stageCfg configs, bool random, int lifes) {
@@ -66,18 +68,25 @@ void resizeCharacters(character** arr, int addSize, int* size) {
     *arr = tmp;
     *size = newCount;
 }
-void fire(character **bullets,int *bulletsLength, character *person,ALLEGRO_EVENT event, float shotPower) {
-    if (person->bullets > 0) {
+void fire(character **bullets,int *bulletsLength, character *person,ALLEGRO_EVENT event, float shotPower, ALLEGRO_TIMER* timer) {
+    if (person->bullets > 0 && (al_get_timer_count(timer) - person->animationFrameCount) > person->animationDuration) {
         resizeCharacters(bullets, 1, bulletsLength);
         if (*bulletsLength > 0) {
             person->bullets--;
+            person->animationFrameCount = al_get_timer_count(timer);
+            person->animationDuration = person->typeCharacter==1? FIRE_TIME: ENEMY_FIRE_TIME;
+            if(person->vx != 0)
+                person->spriteY = 2;
+            else
+               person->spriteY = 3;
+
             character* bala = &((*bullets)[*bulletsLength - 1]);
             float lado = person->flags == 0 ? person->width * 0.8 : 0;
             bala->x = person->x + lado;
-            bala->y = person->y + person->height / 2;
+            bala->y = person->y + person->height / (person->typeCharacter != 5 ? 3 : 2);
             bala->width = 24.0f;
             bala->height = 24.0f;
-            bala->vx = person->flags == 0 ? 5.0f : -5.0f;
+            bala->vx = person->flags == 0 ? BULLET_SPEED : -BULLET_SPEED;
             bala->vy = 0;
             bala->sprite = al_load_bitmap("assets/images/bala_teste.png");
             bala->spriteHeight = 100.0f;
@@ -167,7 +176,8 @@ void colisionType(character* a, character* b, int type, float *cameraX) {
     }
 }
 bool colision(character* a, character* b, int type, float *cameraX){
-    if ((a->x + a->width) > b->x && a->x < (b->x + b->width) &&
+    if (a->active && b->active &&
+        (a->x + a->width) > b->x && a->x < (b->x + b->width) &&
         (a->y + a->height)>b->y && a->y < b->y + b->height) {
         if (type >1) {
             if(type <=3)
@@ -269,7 +279,7 @@ void updatePhisics(character* person, stageCfg *configs) {
        ) {
         configs->cameraX += person->vx;
     }
-    if (person->typeCharacter != 1 && bordas) {
+    if ((person->typeCharacter == 2 || person->typeCharacter == 5) && bordas) {
         person->x += -configs->personagens[0].vx;
     }
     if (bulletType ||
@@ -368,6 +378,7 @@ void updateSprites(ALLEGRO_TIMER* timer, character* person) {
         person->flags = ALLEGRO_FLIP_HORIZONTAL;
     else if (person->vx > 0)
         person->flags = 0;
+   
     if (al_get_timer_count(timer) % 10 == 0) {
         person->spriteX++;
         
@@ -380,23 +391,18 @@ void moveCharacter(ALLEGRO_EVENT event, character* person, ALLEGRO_TIMER* timer)
     person->vy = 0;
     if ((al_get_timer_count(timer) - person->animationFrameCount) > person->animationDuration) {
         person->spriteY = 0;
+        if (handleKeyBoard(event, ALLEGRO_KEY_A) || handleKeyBoard(event, ALLEGRO_KEY_D))
+            person->spriteY = 1;
     }
     
     if (handleKeyBoard(event, ALLEGRO_KEY_A))
     {
         person->vx = -MOVE_SPEED;
-        person->spriteY = 1;
+        
     }
     if (handleKeyBoard(event, ALLEGRO_KEY_D))
     {
         person->vx = MOVE_SPEED;
-        person->spriteY = 1;
-    }
-    if (keyDown(event, ALLEGRO_KEY_P)) {
-        person->spriteY = 2;
-        person->animationDuration = 35;
-        person->animationFrameCount = al_get_timer_count(timer);
-
     }
     if (keyDown(event, ALLEGRO_KEY_W)) {
         person->jumpCount++;

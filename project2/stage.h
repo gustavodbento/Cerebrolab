@@ -8,5 +8,5 @@
 #include "structs.h"
 
 void changeStage(ALLEGRO_BITMAP** background, stageCfg *configs, int stage);
-void printDialog(stageCfg configs);
+bool printDialog(stageCfg configs, ALLEGRO_EVENT event, float mouseX, float mouseY);
 #endif

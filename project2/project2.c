@@ -34,7 +34,7 @@ int main()
     al_register_event_source(event_queue, al_get_display_event_source(display));
     al_register_event_source(event_queue, al_get_timer_event_source(timer));
     al_register_event_source(event_queue, al_get_mouse_event_source());
-    al_set_window_title(display, "Metal Slug");
+    al_set_window_title(display, "Ardennes");
     al_start_timer(timer);
     stageCfg configs;
     configs.cameraX = 0;
@@ -59,7 +59,12 @@ int main()
         {DISPLAY_WIDTH / 2,170, "Opcoes", optionsFont, fontColorWhite},
         {DISPLAY_WIDTH / 2,200, "Sair", optionsFont, fontColorWhite}
     };
+    card selectCharacter[2] = {
+        {DISPLAY_WIDTH / 2 - 148,DISPLAY_HEIGHT/2,128,128,50,0,0, al_load_bitmap("assets/images/principal.png"),"Fred",optionsFont, al_map_rgb(255,255,255), true},
+        {DISPLAY_WIDTH / 2 + 20,DISPLAY_HEIGHT / 2,128,128,50,0,0, al_load_bitmap("assets/images/principal_1.png"),"Lucia",optionsFont,al_map_rgb(255,255,255), true}
+    };
     bool isRunning = true;
+    bool gameIsActive = false;
     float mouseX = 0;
     float mouseY = 0;
     al_set_audio_stream_playmode(musica, ALLEGRO_PLAYMODE_LOOP);
@@ -84,7 +89,7 @@ int main()
                 changeStage(&background, &configs, configs.stage);
             char* title;
             if (configs.lastStage == 0) {
-                title = "Word War";
+                title = "Ardennes";
             }
             else if (configs.complete) {
                 title = "Vitoria";
@@ -98,17 +103,12 @@ int main()
             
             if (!menuScreens[1]) {
                 for (int i = 0; i < 3; i++) {
-                    if (mouseButtonHover(mouseX, mouseY, menuOptions[i])) {
-                        menuOptions[i].color = fontColorYellow;
-                    }else {
-                        menuOptions[i].color = fontColorWhite;
-                    }
+                    mouseHoverButton(mouseX, mouseY, &menuOptions[i], fontColorYellow, fontColorWhite);
                     al_draw_text(menuOptions[i].font, menuOptions[i].color, menuOptions[i].x, menuOptions[i].y, ALLEGRO_ALIGN_CENTRE, menuOptions[i].text);
-                    if (mouseButtonHover(mouseX, mouseY, menuOptions[i]) && mouseClick(event)) {
+                   
+                    if (mouseClickButton(event,mouseX,mouseY, menuOptions[i])) {
                         if (i == 0) {
-                            changeStage(&background,&configs,1);
                             menuScreens[1] = true;
-                            menuScreens[0] = true;
                             break;
                         }
                         if (i == 2) {
@@ -119,12 +119,29 @@ int main()
                     
                    
                 }
+            }else if (!menuScreens[2]) {
+                for (int i = 0; i < 2; i++) {
+                    card cardSelect = selectCharacter[i];
+                    ALLEGRO_COLOR color = cardSelect.color;
+                    if (mouseHoverCard(cardSelect, mouseX, mouseY))
+                        color = al_map_rgb(255, 255, 0);
+                    drawCard(cardSelect, color, font);
+                    if (mouseHoverCard(cardSelect, mouseX, mouseY) && event.type == ALLEGRO_EVENT_MOUSE_BUTTON_DOWN) {
+                        configs.personSelected = i;
+                        menuScreens[0] = true;
+                        menuScreens[2] = true;
+                        changeStage(&background,&configs,1);
+                        gameIsActive = true;
+                        break;
+                        
+                    }
+                }
             }
 
         }
         //inicio do jogo
         if (menuScreens[0]) {
-            if (configs.personagens[0].active) {
+            if (gameIsActive) {
                 character *person = &configs.personagens[0];
                 bool bordas = (person->vx > 0 && configs.cameraX + configs.partitionBackground < configs.backgroundWidth ||
                     (person->vx < 0 && configs.cameraX > 0));
@@ -166,33 +183,41 @@ int main()
                 for (int i = 0; i < configs.personagens[0].life; i++) {
                     al_draw_bitmap(life, i * 36 + 5, 20, 0);
                 }
-                //move o personagem
-                printDialog(configs);
-                moveCharacter(event, &configs.personagens[0], timer);
-                //atira
-                if (keyDown(event, ALLEGRO_KEY_P) && configs.personagens[0].bullets > 0) {
-                    fire(&configs.objetos, &configs.objetosLength, &configs.personagens[0], event,25);
-                }
-                for (int i = 1; i < configs.personagensLength; i++) {
-                    if (configs.personagens[i].active) {
-                        moveEnemys(event, configs.personagens[0], &configs.personagens[i], configs);
-                        for (int j = 1; j < configs.personagensLength; j++) {
-                            if (j != i) {
-                                colision(&configs.personagens[i], &configs.personagens[j], 3, &configs.cameraX);
-                            }
-                        }
-                        float distanceX = fabs(configs.personagens[0].x - configs.personagens[i].x);
-                        if (distanceX <= RANGE_COMBAT && (al_get_timer_count(timer) - configs.personagens[i].fireFrameCount) > 60) {
-                            configs.personagens[i].fireFrameCount = al_get_timer_count(timer);
-                            fire(&configs.objetos, &configs.objetosLength, &configs.personagens[i], event,
-                                configs.personagens[i].typeCharacter == 2? 25:50);
-                        }
-                        if (colision(&configs.personagens[0], &configs.personagens[i], 1, &configs.cameraX))
-                            break;
-
-
+                //dialogos
+                if (!printDialog(configs, event, mouseX, mouseY)) {
+                    //move o personagem
+                    moveCharacter(event, &configs.personagens[0], timer);
+                    //atira
+                    if (keyDown(event, ALLEGRO_KEY_P)) {
+                        fire(&configs.objetos, &configs.objetosLength, person, event, 25, timer);
                     }
+                    for (int i = 1; i < configs.personagensLength; i++) {
+                        if (configs.personagens[i].active) {
+                            moveEnemys(event, configs.personagens[0], &configs.personagens[i], configs);
+                            for (int j = 1; j < configs.personagensLength; j++) {
+                                if (j != i) {
+                                    colision(&configs.personagens[i], &configs.personagens[j], 3, &configs.cameraX);
+                                }
+                            }
+                            float distanceX = fabs(configs.personagens[0].x - configs.personagens[i].x);
+                            if (distanceX <= RANGE_COMBAT) {
+                                fire(&configs.objetos, &configs.objetosLength, &configs.personagens[i], event,
+                                    configs.personagens[i].typeCharacter == 2 ? 25 : 50, timer);
+                            }
+                            if (colision(&configs.personagens[0], &configs.personagens[i], 1, &configs.cameraX))
+                                break;
+
+
+                        }
+                    }
+                } else {
+                    for (int i = 0; i < configs.personagensLength; i++) {
+                        configs.personagens[i].vx = 0;
+                        configs.personagens[i].vy = 0;
+                    }
+
                 }
+                
                 int characterInactives = 0;
                 for (int i = 0; i < configs.personagensLength; i++) {
                     if (configs.personagens[i].active) {
@@ -201,10 +226,10 @@ int main()
                         updateSprites(timer, &configs.personagens[i]);
                     }
                     else {
-                        if (configs.personagens[i].typeCharacter == 3) {
-                            menuScreens[0] = false;
-                            menuScreens[1] = false;
-                            configs.stage = 0;
+                        if (configs.personagens[i].typeCharacter == 1)
+                            gameIsActive = false;
+                        if (configs.personagens[i].typeCharacter == 5) {
+                            gameIsActive = false;
                             configs.complete = true;
                         }
                             
@@ -245,9 +270,8 @@ int main()
                 }
             }
             else {
-                menuScreens[0] = false;
-                menuScreens[1] = false;
-               
+                for (int i = 0; i < menuLen; i++)
+                    menuScreens[i] = false;
                 configs.stage = 0;
             }
         }
